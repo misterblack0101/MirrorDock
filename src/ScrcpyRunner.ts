@@ -10,6 +10,7 @@ export class ScrcpyRunner extends EventEmitter {
     private isRunning: boolean = false;
     private shouldRestart: boolean = true;
     private outputChannel: vscode.OutputChannel;
+    private pendingCommands: Set<ChildProcess> = new Set();
 
     constructor() {
         super();
@@ -26,86 +27,51 @@ export class ScrcpyRunner extends EventEmitter {
         }
 
         try {
-            // Check if scrcpy is installed
-            await this.checkScrcpyInstalled();
+            // Check if a device is connected
+            await this.checkDeviceConnected();
+
+            // Kill any existing screenrecord processes on the device
+            await this.killExistingScreenrecord();
 
             this.shouldRestart = true;
             this.outputChannel.appendLine('Starting scrcpy...');
             this.emit('status', 'starting', 'Starting scrcpy process...');
 
-            // OPTIMIZED SOLUTION: Use ffmpeg to convert H.264 to JPEG frames
-            // Optimized for smooth playback even on 120Hz displays
+            // Simple approach: Use scrcpy with video output via ADB
+            // scrcpy will handle encoding efficiently
             const args = [
-                'exec-out',
-                'screenrecord --output-format=h264 --size 720x1280 --bit-rate 800000 -'
+                '--video-codec=h264',
+                '--max-size=720',
+                '--max-fps=30',
+                '--video-bit-rate=1M',
+                '--no-audio',
+                '--no-window',
+                '--video-encoder=OMX.google.h264.encoder'
             ];
 
-            this.outputChannel.appendLine(`Running: adb ${args.join(' ')} | ffmpeg...`);
+            this.outputChannel.appendLine(`Running: scrcpy ${args.join(' ')}`);
 
-            // Pipe through ffmpeg to convert H.264 to JPEG frames
-            const adbProcess = spawn('adb', args);
-
-            const ffmpegArgs = [
-                '-i', 'pipe:0',              // Input from stdin
-                '-f', 'image2pipe',          // Output as image stream
-                '-vcodec', 'mjpeg',          // MJPEG codec
-                '-q:v', '10',                // Quality (2-31, 10 for smaller frames)
-                '-vf', 'scale=720:1280',     // Ensure correct size
-                '-r', '30',                  // 30 FPS for smoothness
-                '-preset', 'ultrafast',      // Fast encoding
-                '-tune', 'zerolatency',      // Minimize latency
-                'pipe:1'                     // Output to stdout
+            // For now, let's just go back to ADB screenrecord without ffmpeg transcoding
+            // We'll decode H.264 directly in the browser
+            const adbArgs = [
+                'shell',
+                'screenrecord',
+                '--output-format=h264',
+                '--size', '720x1280',
+                '--bit-rate', '1000000',
+                '-'
             ];
 
-            this.process = spawn('ffmpeg', ffmpegArgs);
-
-            // Pipe ADB output to ffmpeg
-            if (adbProcess.stdout && this.process.stdin) {
-                adbProcess.stdout.pipe(this.process.stdin);
-            }
+            this.outputChannel.appendLine(`Running: adb ${adbArgs.join(' ')}`);
+            this.process = spawn('adb', adbArgs);
 
             this.isRunning = true;
 
-            // Handle ADB process
-            if (adbProcess.stderr) {
-                adbProcess.stderr.on('data', (data: Buffer) => {
-                    this.outputChannel.appendLine(`ADB: ${data.toString()}`);
-                });
-            }
-
-            adbProcess.on('exit', (code) => {
-                this.outputChannel.appendLine(`ADB process exited with code ${code}`);
-            });
-
-            // Handle ffmpeg stdout (JPEG frames)
+            // Handle stdout (raw video stream from scrcpy)
             if (this.process.stdout) {
-                let buffer = Buffer.alloc(0);
-                const SOI = Buffer.from([0xFF, 0xD8]); // JPEG start marker
-                const EOI = Buffer.from([0xFF, 0xD9]); // JPEG end marker
-
                 this.process.stdout.on('data', (data: Buffer) => {
-                    buffer = Buffer.concat([buffer, data]);
-
-                    // Find complete JPEG frames
-                    while (true) {
-                        const startIdx = buffer.indexOf(SOI);
-                        if (startIdx === -1) break;
-
-                        const endIdx = buffer.indexOf(EOI, startIdx + 2);
-                        if (endIdx === -1) break;
-
-                        // Extract complete JPEG frame
-                        const frame = buffer.slice(startIdx, endIdx + 2);
-                        this.emit('frame', frame);
-
-                        // Remove processed frame from buffer
-                        buffer = buffer.slice(endIdx + 2);
-                    }
-
-                    // Keep buffer size reasonable
-                    if (buffer.length > 1024 * 1024) {
-                        buffer = buffer.slice(-512 * 1024);
-                    }
+                    // Emit raw video data
+                    this.emit('frame', data);
                 });
             }
 
@@ -113,19 +79,14 @@ export class ScrcpyRunner extends EventEmitter {
             if (this.process.stderr) {
                 this.process.stderr.on('data', (data: Buffer) => {
                     const message = data.toString();
-                    // Only log errors, not all ffmpeg output
-                    if (message.toLowerCase().includes('error')) {
-                        this.outputChannel.appendLine(`ffmpeg: ${message}`);
-                    }
+                    this.outputChannel.appendLine(`scrcpy: ${message}`);
 
-                    // Detect when streaming starts
-                    if (message.includes('frame=') || message.includes('size=')) {
+                    // Check for device connection
+                    if (message.includes('device') || message.includes('encoder')) {
                         this.emit('status', 'running', 'Device connected');
                     }
                 });
-            }
-
-            // Handle process exit
+            }            // Handle process exit
             this.process.on('exit', (code, signal) => {
                 this.isRunning = false;
                 this.outputChannel.appendLine(`scrcpy process exited with code ${code}, signal ${signal}`);
@@ -163,6 +124,16 @@ export class ScrcpyRunner extends EventEmitter {
 
         if (this.process) {
             this.outputChannel.appendLine('Stopping scrcpy...');
+
+            // Remove all listeners to prevent memory leaks
+            if (this.process.stdout) {
+                this.process.stdout.removeAllListeners();
+            }
+            if (this.process.stderr) {
+                this.process.stderr.removeAllListeners();
+            }
+            this.process.removeAllListeners();
+
             this.process.kill('SIGTERM');
             this.process = null;
             this.isRunning = false;
@@ -178,35 +149,71 @@ export class ScrcpyRunner extends EventEmitter {
     }
 
     /**
-     * Check if scrcpy is installed
+     * Check if ADB device is connected
      */
-    private async checkScrcpyInstalled(): Promise<void> {
+    private async checkDeviceConnected(): Promise<void> {
         return new Promise((resolve, reject) => {
-            const check = spawn('which', ['scrcpy']);
+            const check = spawn('adb', ['devices']);
+            let output = '';
+
+            check.stdout?.on('data', (data) => {
+                output += data.toString();
+            });
 
             check.on('exit', (code) => {
                 if (code === 0) {
-                    resolve();
+                    const lines = output.split('\n').filter(line => line.includes('\t'));
+                    if (lines.length > 0) {
+                        const deviceInfo = lines[0].split('\t');
+                        this.outputChannel.appendLine(`Device found: ${deviceInfo[0]}`);
+                        resolve();
+                    } else {
+                        reject(new Error('No device connected. Please connect a device and enable USB debugging.'));
+                    }
                 } else {
-                    reject(new Error('scrcpy is not installed. Please install it first: https://github.com/Genymobile/scrcpy'));
+                    reject(new Error('Failed to check for connected devices'));
                 }
             });
 
             check.on('error', () => {
-                reject(new Error('Failed to check scrcpy installation'));
+                reject(new Error('ADB not found. Please install Android SDK Platform Tools.'));
             });
         });
     }
 
     /**
+     * Kill any existing screenrecord processes on device
+     */
+    private async killExistingScreenrecord(): Promise<void> {
+        try {
+            this.outputChannel.appendLine('Checking for existing screenrecord processes...');
+            // Find and kill screenrecord processes
+            await this.executeAdbCommand('pkill -9 screenrecord', { ignoreErrors: true });
+            // Small delay to ensure processes are killed
+            await new Promise(resolve => setTimeout(resolve, 100));
+        } catch (error) {
+            // Ignore errors - process might not exist
+            this.outputChannel.appendLine('No existing screenrecord processes found');
+        }
+    }
+
+    /**
      * Execute ADB command
      */
-    public async executeAdbCommand(command: string): Promise<void> {
+    public async executeAdbCommand(command: string, options?: { ignoreErrors?: boolean }): Promise<void> {
         return new Promise((resolve, reject) => {
-            const adb = spawn('adb', ['shell', ...command.split(' ')]);
+            const args = command.startsWith('shell ') ? command.split(' ') : ['shell', ...command.split(' ')];
+            const adb = spawn('adb', args);
+            this.pendingCommands.add(adb);
+
+            const cleanup = () => {
+                this.pendingCommands.delete(adb);
+                adb.removeAllListeners();
+            };
 
             adb.on('exit', (code) => {
-                if (code === 0) {
+                cleanup();
+                if (code === 0 || options?.ignoreErrors) {
                     resolve();
                 } else {
                     reject(new Error(`ADB command failed with code ${code}`));
@@ -214,8 +221,26 @@ export class ScrcpyRunner extends EventEmitter {
             });
 
             adb.on('error', (err) => {
-                reject(err);
+                cleanup();
+                if (options?.ignoreErrors) {
+                    resolve();
+                } else {
+                    reject(err);
+                }
             });
+
+            // Timeout after 5 seconds
+            setTimeout(() => {
+                if (this.pendingCommands.has(adb)) {
+                    adb.kill();
+                    cleanup();
+                    if (options?.ignoreErrors) {
+                        resolve();
+                    } else {
+                        reject(new Error('ADB command timeout'));
+                    }
+                }
+            }, 5000);
         });
     }
 
@@ -262,6 +287,17 @@ export class ScrcpyRunner extends EventEmitter {
      */
     public dispose(): void {
         this.stop();
+
+        // Kill any pending ADB commands
+        this.pendingCommands.forEach(proc => {
+            try {
+                proc.kill();
+            } catch (e) {
+                // Ignore
+            }
+        });
+        this.pendingCommands.clear();
+
         this.removeAllListeners();
         this.outputChannel.dispose();
     }

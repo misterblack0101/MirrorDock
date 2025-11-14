@@ -30,20 +30,18 @@
      */
     function init() {
         console.log('[View] Initializing...');
-        console.log('[View] JpegDecoder available:', !!window.JpegDecoder);
+        console.log('[View] H264Decoder available:', !!window.H264Decoder);
 
-        // Initialize JPEG decoder
-        if (window.JpegDecoder) {
-            decoder = new window.JpegDecoder();
+        // Initialize H.264 decoder
+        if (window.H264Decoder) {
+            decoder = new window.H264Decoder();
             decoder.init(canvas);
             decoder.onFrameReady = onFrameRendered;
             console.log('[View] Decoder initialized successfully');
         } else {
-            console.error('[View] JPEG Decoder not available');
-            updateStatus('JPEG Decoder not loaded', 'error');
-        }
-
-        // Setup canvas
+            console.error('[View] H.264 Decoder not available');
+            updateStatus('H.264 Decoder not loaded', 'error');
+        }        // Setup canvas
         setupCanvas();
 
         // Setup event listeners
@@ -122,7 +120,22 @@
             case 'deviceInfo':
                 handleDeviceInfo(message.width, message.height);
                 break;
+            case 'clear':
+                handleClear();
+                break;
         }
+    }
+
+    /**
+     * Handle clear command (restart)
+     */
+    function handleClear() {
+        console.log('[View] Clearing decoder state for restart...');
+        if (decoder) {
+            decoder.clear();
+        }
+        canvas.classList.remove('active');
+        loading.classList.add('show');
     }
 
     /**
@@ -414,10 +427,25 @@
         });
     }
 
+    /**
+     * Cleanup resources when page unloads
+     */
+    function cleanup() {
+        console.log('[View] Cleaning up resources...');
+        if (decoder && typeof decoder.dispose === 'function') {
+            decoder.dispose();
+        }
+        decoder = null;
+    }
+
     // Initialize when DOM is ready
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {
         init();
     }
+
+    // Cleanup on unload
+    window.addEventListener('beforeunload', cleanup);
+    window.addEventListener('pagehide', cleanup);
 })();
