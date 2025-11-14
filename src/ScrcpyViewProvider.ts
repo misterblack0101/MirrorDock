@@ -172,7 +172,7 @@ export class ScrcpyViewProvider implements vscode.WebviewViewProvider {
             vscode.Uri.joinPath(this._extensionUri, 'webview', 'style.css')
         );
         const decoderScriptUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'webview', 'h264', 'decoder.js')
+            vscode.Uri.joinPath(this._extensionUri, 'webview', 'jpeg', 'decoder.js')
         );
 
         // Use a nonce to whitelist which scripts can be run
@@ -186,7 +186,7 @@ export class ScrcpyViewProvider implements vscode.WebviewViewProvider {
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; 
         style-src ${webview.cspSource} 'unsafe-inline'; 
         script-src 'nonce-${nonce}' ${webview.cspSource};
-        img-src ${webview.cspSource} data:;
+        img-src ${webview.cspSource} data: blob:;
         connect-src ${webview.cspSource};">
     <link href="${styleUri}" rel="stylesheet">
     <title>Scrcpy Device</title>

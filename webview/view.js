@@ -30,17 +30,17 @@
      */
     function init() {
         console.log('[View] Initializing...');
-        console.log('[View] H264Decoder available:', !!window.H264Decoder);
+        console.log('[View] JpegDecoder available:', !!window.JpegDecoder);
 
-        // Initialize H.264 decoder
-        if (window.H264Decoder) {
-            decoder = new window.H264Decoder();
+        // Initialize JPEG decoder
+        if (window.JpegDecoder) {
+            decoder = new window.JpegDecoder();
             decoder.init(canvas);
             decoder.onFrameReady = onFrameRendered;
             console.log('[View] Decoder initialized successfully');
         } else {
-            console.error('[View] H.264 Decoder not available');
-            updateStatus('H.264 Decoder not loaded', 'error');
+            console.error('[View] JPEG Decoder not available');
+            updateStatus('JPEG Decoder not loaded', 'error');
         }
 
         // Setup canvas
@@ -57,9 +57,7 @@
         }
 
         console.log('[View] Initialization complete');
-    }
-
-    /**
+    }    /**
      * Setup canvas dimensions
      */
     function setupCanvas() {

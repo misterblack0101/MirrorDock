@@ -33,29 +33,79 @@ export class ScrcpyRunner extends EventEmitter {
             this.outputChannel.appendLine('Starting scrcpy...');
             this.emit('status', 'starting', 'Starting scrcpy process...');
 
-            // PRODUCTION SOLUTION: Use ADB screenrecord for actual H.264 stream
-            // This gives us real H.264 NAL units that Broadway.js can decode
+            // OPTIMIZED SOLUTION: Use ffmpeg to convert H.264 to JPEG frames
+            // Optimized for low latency and reasonable quality
             const args = [
-                'shell',
-                'screenrecord',
-                '--output-format=h264',  // Raw H.264 output
-                '--size',
-                '720x1280',
-                '--bit-rate',
-                '2000000',
-                '-'  // Output to stdout
+                'exec-out',
+                'screenrecord --output-format=h264 --size 720x1280 --bit-rate 1000000 -'
             ];
 
-            this.outputChannel.appendLine(`Running: adb ${args.join(' ')}`);
-            this.process = spawn('adb', args);
+            this.outputChannel.appendLine(`Running: adb ${args.join(' ')} | ffmpeg...`);
+
+            // Pipe through ffmpeg to convert H.264 to JPEG frames
+            const adbProcess = spawn('adb', args);
+
+            const ffmpegArgs = [
+                '-i', 'pipe:0',              // Input from stdin
+                '-f', 'image2pipe',          // Output as image stream
+                '-vcodec', 'mjpeg',          // MJPEG codec
+                '-q:v', '8',                 // Quality (2-31, 8 is good balance)
+                '-vf', 'scale=720:1280',     // Ensure correct size
+                '-r', '20',                  // 20 FPS
+                '-preset', 'ultrafast',      // Fast encoding
+                '-tune', 'zerolatency',      // Minimize latency
+                'pipe:1'                     // Output to stdout
+            ];
+
+            this.process = spawn('ffmpeg', ffmpegArgs);
+
+            // Pipe ADB output to ffmpeg
+            if (adbProcess.stdout && this.process.stdin) {
+                adbProcess.stdout.pipe(this.process.stdin);
+            }
 
             this.isRunning = true;
 
-            // Handle stdout (H.264 video stream)
+            // Handle ADB process
+            if (adbProcess.stderr) {
+                adbProcess.stderr.on('data', (data: Buffer) => {
+                    this.outputChannel.appendLine(`ADB: ${data.toString()}`);
+                });
+            }
+
+            adbProcess.on('exit', (code) => {
+                this.outputChannel.appendLine(`ADB process exited with code ${code}`);
+            });
+
+            // Handle ffmpeg stdout (JPEG frames)
             if (this.process.stdout) {
+                let buffer = Buffer.alloc(0);
+                const SOI = Buffer.from([0xFF, 0xD8]); // JPEG start marker
+                const EOI = Buffer.from([0xFF, 0xD9]); // JPEG end marker
+
                 this.process.stdout.on('data', (data: Buffer) => {
-                    // Emit raw H.264 frame data
-                    this.emit('frame', data);
+                    buffer = Buffer.concat([buffer, data]);
+
+                    // Find complete JPEG frames
+                    while (true) {
+                        const startIdx = buffer.indexOf(SOI);
+                        if (startIdx === -1) break;
+
+                        const endIdx = buffer.indexOf(EOI, startIdx + 2);
+                        if (endIdx === -1) break;
+
+                        // Extract complete JPEG frame
+                        const frame = buffer.slice(startIdx, endIdx + 2);
+                        this.emit('frame', frame);
+
+                        // Remove processed frame from buffer
+                        buffer = buffer.slice(endIdx + 2);
+                    }
+
+                    // Keep buffer size reasonable
+                    if (buffer.length > 1024 * 1024) {
+                        buffer = buffer.slice(-512 * 1024);
+                    }
                 });
             }
 
@@ -63,10 +113,13 @@ export class ScrcpyRunner extends EventEmitter {
             if (this.process.stderr) {
                 this.process.stderr.on('data', (data: Buffer) => {
                     const message = data.toString();
-                    this.outputChannel.appendLine(`scrcpy: ${message}`);
+                    // Only log errors, not all ffmpeg output
+                    if (message.toLowerCase().includes('error')) {
+                        this.outputChannel.appendLine(`ffmpeg: ${message}`);
+                    }
 
-                    // Check for device connection
-                    if (message.includes('device')) {
+                    // Detect when streaming starts
+                    if (message.includes('frame=') || message.includes('size=')) {
                         this.emit('status', 'running', 'Device connected');
                     }
                 });
