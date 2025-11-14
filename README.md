@@ -1,6 +1,6 @@
-# Android Screen for VS Code
+# MirrorDock
 
-View your Android device screen directly in VS Code's sidebar.
+Mirror your Android device screen directly in VS Code's sidebar.
 
 ## Features
 
@@ -39,8 +39,8 @@ Download [Android SDK Platform Tools](https://developer.android.com/studio/relea
 
 1. Clone this repository:
    ```bash
-   git clone https://github.com/yourusername/android-screen
-   cd android-screen
+   git clone https://github.com/yourusername/mirrordock
+   cd mirrordock
    ```
 
 2. Install dependencies:
@@ -70,9 +70,9 @@ Download [Android SDK Platform Tools](https://developer.android.com/studio/relea
 
 ### Commands
 
-- `Android Screen: Start`
-- `Android Screen: Stop`
-- `Android Screen: Restart`
+- `MirrorDock: Start`
+- `MirrorDock: Stop`
+- `MirrorDock: Restart`
 
 ## Troubleshooting
 

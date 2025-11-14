@@ -13,7 +13,7 @@ export class AndroidStreamRunner extends EventEmitter {
 
     constructor() {
         super();
-        this.outputChannel = vscode.window.createOutputChannel('Android Screen');
+        this.outputChannel = vscode.window.createOutputChannel('MirrorDock');
     }
 
     public async start(): Promise<void> {

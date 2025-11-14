@@ -1,13 +1,13 @@
 {
-  "name": "android-screen",
-  "displayName": "Android Screen",
-  "description": "View Android device screen directly in VS Code",
+  "name": "mirrordock",
+  "displayName": "MirrorDock",
+  "description": "Mirror your Android device screen directly in VS Code",
   "version": "0.1.0",
   "publisher": "your-publisher-name",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/android-screen"
+    "url": "https://github.com/yourusername/mirrordock"
   },
   "engines": {
     "vscode": "^1.85.0"
@@ -20,53 +20,53 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "android-screen-sidebar",
-          "title": "Android Screen",
+          "id": "mirrordock-sidebar",
+          "title": "MirrorDock",
           "icon": "$(device-mobile)"
         }
       ]
     },
     "views": {
-      "android-screen-sidebar": [
+      "mirrordock-sidebar": [
         {
           "type": "webview",
-          "id": "androidScreen.deviceView",
+          "id": "mirrordock.deviceView",
           "name": "Device Screen"
         }
       ]
     },
     "commands": [
       {
-        "command": "androidScreen.start",
-        "title": "Android Screen: Start",
+        "command": "mirrordock.start",
+        "title": "MirrorDock: Start",
         "icon": "$(play)"
       },
       {
-        "command": "androidScreen.stop",
-        "title": "Android Screen: Stop",
+        "command": "mirrordock.stop",
+        "title": "MirrorDock: Stop",
         "icon": "$(stop)"
       },
       {
-        "command": "androidScreen.restart",
-        "title": "Android Screen: Restart",
+        "command": "mirrordock.restart",
+        "title": "MirrorDock: Restart",
         "icon": "$(refresh)"
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "androidScreen.start",
-          "when": "view == androidScreen.deviceView",
+          "command": "mirrordock.start",
+          "when": "view == mirrordock.deviceView",
           "group": "navigation@1"
         },
         {
-          "command": "androidScreen.stop",
-          "when": "view == androidScreen.deviceView",
+          "command": "mirrordock.stop",
+          "when": "view == mirrordock.deviceView",
           "group": "navigation@2"
         },
         {
-          "command": "androidScreen.restart",
-          "when": "view == androidScreen.deviceView",
+          "command": "mirrordock.restart",
+          "when": "view == mirrordock.deviceView",
           "group": "navigation@3"
         }
       ]

@@ -8,7 +8,7 @@ export function activate(context: vscode.ExtensionContext) {
     // Register WebView panel in activity bar
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(
-            'androidScreen.deviceView',
+            'mirrordock.deviceView',
             provider,
             { webviewOptions: { retainContextWhenHidden: true } }
         )
@@ -16,15 +16,15 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Register commands
     context.subscriptions.push(
-        vscode.commands.registerCommand('androidScreen.start', () => provider.start())
+        vscode.commands.registerCommand('mirrordock.start', () => provider.start())
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('androidScreen.stop', () => provider.stop())
+        vscode.commands.registerCommand('mirrordock.stop', () => provider.stop())
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('androidScreen.restart', () => provider.restart())
+        vscode.commands.registerCommand('mirrordock.restart', () => provider.restart())
     );
 }
 
