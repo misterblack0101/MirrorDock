@@ -67,6 +67,20 @@ export class ScrcpyRunner extends EventEmitter {
 
             this.isRunning = true;
 
+            // Force a screen update to trigger immediate keyframe
+            // Wait a bit for screenrecord to initialize, then wake the screen
+            setTimeout(async () => {
+                try {
+                    // Press and release power button to wake/refresh screen
+                    await this.executeAdbCommand('input keyevent KEYCODE_WAKEUP', { ignoreErrors: true });
+                    // Small screen movement to force frame update without disrupting UI
+                    await this.executeAdbCommand('input swipe 0 0 0 1 10', { ignoreErrors: true });
+                    this.outputChannel.appendLine('Triggered screen refresh for keyframe');
+                } catch (e) {
+                    // Ignore errors, this is best-effort
+                }
+            }, 500);
+
             // Handle stdout (raw video stream from scrcpy)
             if (this.process.stdout) {
                 this.process.stdout.on('data', (data: Buffer) => {
