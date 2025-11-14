@@ -1,0 +1,92 @@
+{
+  "name": "scrcpy-vscode",
+  "displayName": "Scrcpy Device Mirror",
+  "description": "Embed Android device screen in VSCode using scrcpy",
+  "version": "0.1.0",
+  "publisher": "your-publisher-name",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:scrcpy.deviceView"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "scrcpy-sidebar",
+          "title": "Scrcpy Device",
+          "icon": "$(device-mobile)"
+        }
+      ]
+    },
+    "views": {
+      "scrcpy-sidebar": [
+        {
+          "type": "webview",
+          "id": "scrcpy.deviceView",
+          "name": "Device Screen"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "scrcpy.start",
+        "title": "Scrcpy: Start Device Mirror",
+        "icon": "$(play)"
+      },
+      {
+        "command": "scrcpy.stop",
+        "title": "Scrcpy: Stop Device Mirror",
+        "icon": "$(stop)"
+      },
+      {
+        "command": "scrcpy.restart",
+        "title": "Scrcpy: Restart Device Mirror",
+        "icon": "$(refresh)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "scrcpy.start",
+          "when": "view == scrcpy.deviceView",
+          "group": "navigation@1"
+        },
+        {
+          "command": "scrcpy.stop",
+          "when": "view == scrcpy.deviceView",
+          "group": "navigation@2"
+        },
+        {
+          "command": "scrcpy.restart",
+          "when": "view == scrcpy.deviceView",
+          "group": "navigation@3"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile",
+    "lint": "eslint src --ext ts",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.x",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "eslint": "^8.54.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "broadway-player": "^0.1.1"
+  }
+}
