@@ -22,6 +22,15 @@
     let touchStartY = 0;
     let touchStartTime = 0;
     let isTouching = false;
+    // Drag/send movement tracking
+    let pendingClientX = null;
+    let pendingClientY = null;
+    let lastSentDeviceX = null;
+    let lastSentDeviceY = null;
+    let lastSendTime = 0;
+    const SEND_INTERVAL = 60; // ms between drag segments (~16Hz)
+    let dragLoopRunning = false;
+    let hasSentSegments = false;
     function init() {
         console.log('[View] Initializing...');
         console.log('[View] H264Decoder available:', !!window.H264Decoder);
@@ -245,9 +254,9 @@
      * Convert canvas coordinates to device coordinates
      */
     function canvasToDevice(canvasX, canvasY) {
-        const rect = canvas.getBoundingClientRect();
-        const scaleX = deviceWidth / rect.width;
-        const scaleY = deviceHeight / rect.height;
+        // Use canvas internal dimensions, not the displayed CSS size
+        const scaleX = canvas.width / canvas.getBoundingClientRect().width;
+        const scaleY = canvas.height / canvas.getBoundingClientRect().height;
 
         return {
             x: Math.round(canvasX * scaleX),
@@ -276,6 +285,14 @@
         touchStartY = coords.y;
         touchStartTime = Date.now();
         isTouching = true;
+        // initialize drag tracking
+        pendingClientX = coords.x;
+        pendingClientY = coords.y;
+        lastSentDeviceX = null;
+        lastSentDeviceY = null;
+        lastSendTime = 0;
+        hasSentSegments = false;
+        scheduleDragLoop();
     }
 
     /**
@@ -284,6 +301,9 @@
     function handleMouseMove(event) {
         if (!isTouching) return;
         event.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        pendingClientX = event.clientX - rect.left;
+        pendingClientY = event.clientY - rect.top;
     }
 
     /**
@@ -292,6 +312,17 @@
     function handleMouseUp(event) {
         if (!isTouching) return;
         event.preventDefault();
+
+        // If we already sent drag segments, stop and don't emit another swipe/tap
+        if (hasSentSegments) {
+            isTouching = false;
+            pendingClientX = null;
+            pendingClientY = null;
+            lastSentDeviceX = null;
+            lastSentDeviceY = null;
+            hasSentSegments = false;
+            return;
+        }
 
         const coords = getCanvasCoords(event);
         const duration = Date.now() - touchStartTime;
@@ -340,6 +371,14 @@
             touchStartY = touch.clientY - rect.top;
             touchStartTime = Date.now();
             isTouching = true;
+            // initialize drag tracking
+            pendingClientX = touchStartX;
+            pendingClientY = touchStartY;
+            lastSentDeviceX = null;
+            lastSentDeviceY = null;
+            lastSendTime = 0;
+            hasSentSegments = false;
+            scheduleDragLoop();
         }
     }
 
@@ -348,6 +387,13 @@
      */
     function handleTouchMove(event) {
         event.preventDefault();
+        if (!isTouching) return;
+        if (event.touches.length > 0) {
+            const touch = event.touches[0];
+            const rect = canvas.getBoundingClientRect();
+            pendingClientX = touch.clientX - rect.left;
+            pendingClientY = touch.clientY - rect.top;
+        }
     }
 
     /**
@@ -356,6 +402,16 @@
     function handleTouchEnd(event) {
         if (!isTouching) return;
         event.preventDefault();
+        // If we already sent drag segments, simply stop
+        if (hasSentSegments) {
+            isTouching = false;
+            pendingClientX = null;
+            pendingClientY = null;
+            lastSentDeviceX = null;
+            lastSentDeviceY = null;
+            hasSentSegments = false;
+            return;
+        }
 
         if (event.changedTouches.length > 0) {
             const touch = event.changedTouches[0];
@@ -386,6 +442,55 @@
                 sendTap(deviceCoords.x, deviceCoords.y);
             }
         }
+    }
+
+    /**
+     * Schedule a RAF-driven loop that posts small drag segments while dragging.
+     */
+    function scheduleDragLoop() {
+        if (dragLoopRunning) return;
+        dragLoopRunning = true;
+        requestAnimationFrame(dragTick);
+    }
+
+    function dragTick() {
+        if (!isTouching) {
+            dragLoopRunning = false;
+            return;
+        }
+
+        const now = Date.now();
+
+        if (pendingClientX == null || pendingClientY == null) {
+            requestAnimationFrame(dragTick);
+            return;
+        }
+
+        const device = canvasToDevice(pendingClientX, pendingClientY);
+
+        if (lastSentDeviceX == null || lastSentDeviceY == null) {
+            lastSentDeviceX = device.x;
+            lastSentDeviceY = device.y;
+            lastSendTime = now;
+            requestAnimationFrame(dragTick);
+            return;
+        }
+
+        if (now - lastSendTime >= SEND_INTERVAL && (device.x !== lastSentDeviceX || device.y !== lastSentDeviceY)) {
+            const dur = Math.max(20, now - lastSendTime);
+            vscode.postMessage({
+                type: 'input',
+                action: 'drag',
+                payload: { x1: lastSentDeviceX, y1: lastSentDeviceY, x2: device.x, y2: device.y, duration: dur }
+            });
+
+            lastSentDeviceX = device.x;
+            lastSentDeviceY = device.y;
+            lastSendTime = now;
+            hasSentSegments = true;
+        }
+
+        requestAnimationFrame(dragTick);
     }
 
     /**

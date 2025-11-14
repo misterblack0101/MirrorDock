@@ -54,6 +54,18 @@ export interface LongPressInputMessage {
   };
 }
 
+export interface DragInputMessage {
+  type: 'input';
+  action: 'drag';
+  payload: {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    duration: number;
+  };
+}
+
 export interface StartMessage {
   type: 'start';
 }
@@ -62,4 +74,10 @@ export interface StopMessage {
   type: 'stop';
 }
 
-export type WebViewMessage = TapInputMessage | SwipeInputMessage | LongPressInputMessage | StartMessage | StopMessage;
+export type WebViewMessage =
+  | TapInputMessage
+  | SwipeInputMessage
+  | LongPressInputMessage
+  | DragInputMessage
+  | StartMessage
+  | StopMessage;

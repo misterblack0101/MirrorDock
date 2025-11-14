@@ -1,6 +1,12 @@
 import * as vscode from 'vscode';
 import { AndroidStreamRunner } from './AndroidStreamRunner';
-import { WebViewMessage, TapInputMessage, SwipeInputMessage, LongPressInputMessage } from './types/messages';
+import {
+    WebViewMessage,
+    TapInputMessage,
+    SwipeInputMessage,
+    LongPressInputMessage,
+    DragInputMessage
+} from './types/messages';
 
 // WebView controller - manages UI panel and routes messages
 export class AndroidViewProvider implements vscode.WebviewViewProvider {
@@ -59,7 +65,7 @@ export class AndroidViewProvider implements vscode.WebviewViewProvider {
     }
 
     private async handleInputMessage(
-        message: TapInputMessage | SwipeInputMessage | LongPressInputMessage
+        message: TapInputMessage | SwipeInputMessage | LongPressInputMessage | DragInputMessage
     ): Promise<void> {
         switch (message.action) {
             case 'tap':
@@ -67,6 +73,15 @@ export class AndroidViewProvider implements vscode.WebviewViewProvider {
                 break;
             case 'swipe':
                 await this.streamRunner.swipe(
+                    message.payload.x1,
+                    message.payload.y1,
+                    message.payload.x2,
+                    message.payload.y2,
+                    message.payload.duration
+                );
+                break;
+            case 'drag':
+                await this.streamRunner.drag(
                     message.payload.x1,
                     message.payload.y1,
                     message.payload.x2,

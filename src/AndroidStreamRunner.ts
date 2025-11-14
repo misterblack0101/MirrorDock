@@ -223,6 +223,20 @@ export class AndroidStreamRunner extends EventEmitter {
         }
     }
 
+    /**
+     * Send a short drag segment to the device. This is used to emulate smooth pointer movement
+     * by sending a sequence of short swipe commands while dragging.
+     */
+    public async drag(x1: number, y1: number, x2: number, y2: number, duration: number): Promise<void> {
+        try {
+            await this.executeAdbCommand(
+                `input swipe ${Math.round(x1)} ${Math.round(y1)} ${Math.round(x2)} ${Math.round(y2)} ${Math.round(duration)}`
+            );
+        } catch (error) {
+            this.outputChannel.appendLine(`Drag segment failed: ${error}`);
+        }
+    }
+
     public async longPress(x: number, y: number, duration: number): Promise<void> {
         try {
             await this.executeAdbCommand(
