@@ -34,10 +34,10 @@ export class ScrcpyRunner extends EventEmitter {
             this.emit('status', 'starting', 'Starting scrcpy process...');
 
             // OPTIMIZED SOLUTION: Use ffmpeg to convert H.264 to JPEG frames
-            // Optimized for low latency and reasonable quality
+            // Optimized for smooth playback even on 120Hz displays
             const args = [
                 'exec-out',
-                'screenrecord --output-format=h264 --size 720x1280 --bit-rate 1000000 -'
+                'screenrecord --output-format=h264 --size 720x1280 --bit-rate 800000 -'
             ];
 
             this.outputChannel.appendLine(`Running: adb ${args.join(' ')} | ffmpeg...`);
@@ -49,9 +49,9 @@ export class ScrcpyRunner extends EventEmitter {
                 '-i', 'pipe:0',              // Input from stdin
                 '-f', 'image2pipe',          // Output as image stream
                 '-vcodec', 'mjpeg',          // MJPEG codec
-                '-q:v', '8',                 // Quality (2-31, 8 is good balance)
+                '-q:v', '10',                // Quality (2-31, 10 for smaller frames)
                 '-vf', 'scale=720:1280',     // Ensure correct size
-                '-r', '20',                  // 20 FPS
+                '-r', '30',                  // 30 FPS for smoothness
                 '-preset', 'ultrafast',      // Fast encoding
                 '-tune', 'zerolatency',      // Minimize latency
                 'pipe:1'                     // Output to stdout

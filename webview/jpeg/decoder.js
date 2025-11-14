@@ -13,10 +13,9 @@ class JpegDecoder {
         this.droppedFrames = 0;
         this.isInitialized = false;
         this.lastFrameTime = Date.now();
-        this.img = new Image();
         this.pendingFrame = null;
-        this.isRendering = false;
-        this.nextFrameUrl = null;
+        this.isDecoding = false;
+        this.animationFrameId = null;
     }
 
     /**
@@ -24,7 +23,7 @@ class JpegDecoder {
      */
     init(canvas) {
         this.canvas = canvas;
-        this.ctx = canvas.getContext('2d');
+        this.ctx = canvas.getContext('2d', { alpha: false });
         console.log('[JpegDecoder] Initializing...');
         this.isInitialized = true;
 
@@ -34,15 +33,6 @@ class JpegDecoder {
             canvas.height = 1280;
         }
 
-        // Setup image load handler
-        this.img.onload = () => {
-            this.renderFrame();
-        };
-
-        this.img.onerror = (error) => {
-            console.error('[JpegDecoder] Image load error:', error);
-        };
-
         // Clear canvas
         this.ctx.fillStyle = '#000000';
         this.ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -51,71 +41,82 @@ class JpegDecoder {
     }
 
     /**
-     * Decode JPEG frame data
+     * Decode JPEG frame data (async with createImageBitmap for speed)
      * @param {Uint8Array} frameData - JPEG image data
      */
-    decode(frameData) {
+    async decode(frameData) {
         if (!this.isInitialized || !this.canvas || !this.ctx) {
-            console.warn('[JpegDecoder] Not initialized');
             return;
         }
 
         this.frameCount++;
 
-        // Drop frame if still rendering previous one (prevent backlog)
-        if (this.isRendering) {
+        // Drop frame if currently decoding (prevent backlog)
+        if (this.isDecoding) {
             this.droppedFrames++;
-            if (this.droppedFrames % 10 === 0) {
-                console.warn(`[JpegDecoder] Dropped ${this.droppedFrames} frames (rendering backlog)`);
-            }
             return;
         }
 
-        // Convert Uint8Array to blob URL
-        const blob = new Blob([frameData], { type: 'image/jpeg' });
-        const url = URL.createObjectURL(blob);
+        this.isDecoding = true;
 
-        // Clean up previous URL
-        if (this.pendingFrame) {
-            URL.revokeObjectURL(this.pendingFrame);
-        }
-        this.pendingFrame = url;
+        try {
+            // Clean up previous frame
+            if (this.pendingFrame) {
+                this.pendingFrame.close();
+                this.pendingFrame = null;
+            }
 
-        // Load the image
-        this.isRendering = true;
-        this.img.src = url;
+            // Use createImageBitmap for fast decoding
+            const blob = new Blob([frameData], { type: 'image/jpeg' });
+            const imageBitmap = await createImageBitmap(blob, {
+                resizeQuality: 'low',
+                premultiplyAlpha: 'none'
+            });
 
-        // Log first frame
-        if (this.frameCount === 1) {
-            console.log('[JpegDecoder] 🎥 First frame received');
-        }
+            // Store for rendering
+            this.pendingFrame = imageBitmap;
 
-        if (this.renderedFrames % 100 === 0 && this.renderedFrames > 0) {
-            const fps = this.calculateFPS();
-            console.log(`[JpegDecoder] Rendered: ${this.renderedFrames}, Dropped: ${this.droppedFrames}, FPS: ${fps.toFixed(1)}`);
+            // Schedule render on next animation frame
+            if (!this.animationFrameId) {
+                this.animationFrameId = requestAnimationFrame(() => this.renderFrame());
+            }
+
+            // Log progress
+            if (this.frameCount === 1) {
+                console.log('[JpegDecoder] 🎥 First frame received');
+            }
+
+            if (this.renderedFrames % 100 === 0 && this.renderedFrames > 0) {
+                const fps = this.calculateFPS();
+                console.log(`[JpegDecoder] Rendered: ${this.renderedFrames}, Dropped: ${this.droppedFrames}, FPS: ${fps.toFixed(1)}`);
+            }
+        } catch (error) {
+            console.error('[JpegDecoder] Decode error:', error);
+        } finally {
+            this.isDecoding = false;
         }
     }
 
     /**
-     * Render the current frame to canvas
+     * Render the current frame to canvas (called via requestAnimationFrame)
      */
     renderFrame() {
-        if (!this.ctx || !this.canvas || !this.img.complete) {
-            this.isRendering = false;
+        this.animationFrameId = null;
+
+        if (!this.ctx || !this.canvas || !this.pendingFrame) {
             return;
         }
 
         // Adjust canvas size to match image (only once)
-        if (this.canvas.width !== this.img.width || this.canvas.height !== this.img.height) {
-            console.log(`[JpegDecoder] Resizing canvas: ${this.canvas.width}x${this.canvas.height} -> ${this.img.width}x${this.img.height}`);
-            this.canvas.width = this.img.width;
-            this.canvas.height = this.img.height;
+        if (this.canvas.width !== this.pendingFrame.width || this.canvas.height !== this.pendingFrame.height) {
+            console.log(`[JpegDecoder] Resizing canvas: ${this.canvas.width}x${this.canvas.height} -> ${this.pendingFrame.width}x${this.pendingFrame.height}`);
+            this.canvas.width = this.pendingFrame.width;
+            this.canvas.height = this.pendingFrame.height;
         }
 
-        // Draw frame to canvas
-        this.ctx.drawImage(this.img, 0, 0);
+        // Draw frame to canvas (ImageBitmap is very fast)
+        this.ctx.drawImage(this.pendingFrame, 0, 0);
         this.renderedFrames++;
-        this.isRendering = false;
 
         if (this.onFrameReady) {
             this.onFrameReady();
@@ -139,10 +140,15 @@ class JpegDecoder {
         this.frameCount = 0;
         this.renderedFrames = 0;
         this.droppedFrames = 0;
-        this.isRendering = false;
+        this.isDecoding = false;
+
+        if (this.animationFrameId) {
+            cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
+        }
 
         if (this.pendingFrame) {
-            URL.revokeObjectURL(this.pendingFrame);
+            this.pendingFrame.close();
             this.pendingFrame = null;
         }
 
