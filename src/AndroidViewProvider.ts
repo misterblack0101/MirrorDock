@@ -1,15 +1,16 @@
 import * as vscode from 'vscode';
-import { ScrcpyRunner } from './ScrcpyRunner';
+import { AndroidStreamRunner } from './AndroidStreamRunner';
 import { WebViewMessage, TapInputMessage, SwipeInputMessage, LongPressInputMessage } from './types/messages';
 
-export class ScrcpyViewProvider implements vscode.WebviewViewProvider {
+// WebView controller - manages UI panel and routes messages
+export class AndroidViewProvider implements vscode.WebviewViewProvider {
     private _view?: vscode.WebviewView;
-    private scrcpyRunner: ScrcpyRunner;
+    private streamRunner: AndroidStreamRunner;
     private autoStart: boolean = false;
 
     constructor(private readonly _extensionUri: vscode.Uri) {
-        this.scrcpyRunner = new ScrcpyRunner();
-        this.setupScrcpyListeners();
+        this.streamRunner = new AndroidStreamRunner();
+        this.setupStreamListeners();
     }
 
     public resolveWebviewView(
@@ -62,10 +63,10 @@ export class ScrcpyViewProvider implements vscode.WebviewViewProvider {
     ): Promise<void> {
         switch (message.action) {
             case 'tap':
-                await this.scrcpyRunner.tap(message.payload.x, message.payload.y);
+                await this.streamRunner.tap(message.payload.x, message.payload.y);
                 break;
             case 'swipe':
-                await this.scrcpyRunner.swipe(
+                await this.streamRunner.swipe(
                     message.payload.x1,
                     message.payload.y1,
                     message.payload.x2,
@@ -74,7 +75,7 @@ export class ScrcpyViewProvider implements vscode.WebviewViewProvider {
                 );
                 break;
             case 'longPress':
-                await this.scrcpyRunner.longPress(
+                await this.streamRunner.longPress(
                     message.payload.x,
                     message.payload.y,
                     message.payload.duration
@@ -83,8 +84,8 @@ export class ScrcpyViewProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    private setupScrcpyListeners(): void {
-        this.scrcpyRunner.on('frame', (data: Buffer) => {
+    private setupStreamListeners(): void {
+        this.streamRunner.on('frame', (data: Buffer) => {
             if (this._view) {
                 this._view.webview.postMessage({
                     type: 'frame',
@@ -93,7 +94,7 @@ export class ScrcpyViewProvider implements vscode.WebviewViewProvider {
             }
         });
 
-        this.scrcpyRunner.on('status', (status: string, message: string) => {
+        this.streamRunner.on('status', (status: string, message: string) => {
             if (this._view) {
                 this._view.webview.postMessage({
                     type: 'status',
@@ -113,7 +114,7 @@ export class ScrcpyViewProvider implements vscode.WebviewViewProvider {
         }
 
         try {
-            await this.scrcpyRunner.start();
+            await this.streamRunner.start();
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Unknown error';
             vscode.window.showErrorMessage(`Failed to start: ${message}`);
@@ -122,7 +123,7 @@ export class ScrcpyViewProvider implements vscode.WebviewViewProvider {
 
     public stop(): void {
         this.autoStart = false;
-        this.scrcpyRunner.stop();
+        this.streamRunner.stop();
     }
 
     public async restart(): Promise<void> {
@@ -196,6 +197,6 @@ export class ScrcpyViewProvider implements vscode.WebviewViewProvider {
     }
 
     public dispose(): void {
-        this.scrcpyRunner.dispose();
+        this.streamRunner.dispose();
     }
 }

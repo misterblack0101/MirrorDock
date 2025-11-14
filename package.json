@@ -1,9 +1,14 @@
 {
-  "name": "scrcpy-vscode",
-  "displayName": "Scrcpy Device Mirror",
-  "description": "Embed Android device screen in VSCode using scrcpy",
+  "name": "android-screen",
+  "displayName": "Android Screen",
+  "description": "View Android device screen directly in VS Code",
   "version": "0.1.0",
   "publisher": "your-publisher-name",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/android-screen"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -15,53 +20,53 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "scrcpy-sidebar",
-          "title": "Scrcpy Device",
+          "id": "android-screen-sidebar",
+          "title": "Android Screen",
           "icon": "$(device-mobile)"
         }
       ]
     },
     "views": {
-      "scrcpy-sidebar": [
+      "android-screen-sidebar": [
         {
           "type": "webview",
-          "id": "scrcpy.deviceView",
+          "id": "androidScreen.deviceView",
           "name": "Device Screen"
         }
       ]
     },
     "commands": [
       {
-        "command": "scrcpy.start",
-        "title": "Scrcpy: Start Device Mirror",
+        "command": "androidScreen.start",
+        "title": "Android Screen: Start",
         "icon": "$(play)"
       },
       {
-        "command": "scrcpy.stop",
-        "title": "Scrcpy: Stop Device Mirror",
+        "command": "androidScreen.stop",
+        "title": "Android Screen: Stop",
         "icon": "$(stop)"
       },
       {
-        "command": "scrcpy.restart",
-        "title": "Scrcpy: Restart Device Mirror",
+        "command": "androidScreen.restart",
+        "title": "Android Screen: Restart",
         "icon": "$(refresh)"
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "scrcpy.start",
-          "when": "view == scrcpy.deviceView",
+          "command": "androidScreen.start",
+          "when": "view == androidScreen.deviceView",
           "group": "navigation@1"
         },
         {
-          "command": "scrcpy.stop",
-          "when": "view == scrcpy.deviceView",
+          "command": "androidScreen.stop",
+          "when": "view == androidScreen.deviceView",
           "group": "navigation@2"
         },
         {
-          "command": "scrcpy.restart",
-          "when": "view == scrcpy.deviceView",
+          "command": "androidScreen.restart",
+          "when": "view == androidScreen.deviceView",
           "group": "navigation@3"
         }
       ]

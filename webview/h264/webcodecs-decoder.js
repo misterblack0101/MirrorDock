@@ -1,3 +1,6 @@
+// H.264 video decoder using WebCodecs API
+// Parses NAL units, extracts SPS/PPS, converts Annex-B to AVCC, renders to canvas
+
 class H264Decoder {
     constructor() {
         this.canvas = null;

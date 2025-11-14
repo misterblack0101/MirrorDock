@@ -1,9 +1,7 @@
-/**
- * WebView Script - Handles device screen display and user interaction
- */
+// WebView UI - canvas interface and input handler
+// Receives video frames from extension, sends input events to device
 
 (function () {
-    // Get VS Code API
     const vscode = acquireVsCodeApi();
 
     // DOM Elements
@@ -24,10 +22,6 @@
     let touchStartY = 0;
     let touchStartTime = 0;
     let isTouching = false;
-
-    /**
-     * Initialize the view
-     */
     function init() {
         console.log('[View] Initializing...');
         console.log('[View] H264Decoder available:', !!window.H264Decoder);

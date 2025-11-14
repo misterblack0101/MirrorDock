@@ -39,8 +39,8 @@ Download [Android SDK Platform Tools](https://developer.android.com/studio/relea
 
 1. Clone this repository:
    ```bash
-   git clone <repository-url>
-   cd scrcpy-extension
+   git clone https://github.com/yourusername/android-screen
+   cd android-screen
    ```
 
 2. Install dependencies:
@@ -70,9 +70,9 @@ Download [Android SDK Platform Tools](https://developer.android.com/studio/relea
 
 ### Commands
 
-- `Scrcpy: Start Device Mirror`
-- `Scrcpy: Stop Device Mirror`
-- `Scrcpy: Restart Device Mirror`
+- `Android Screen: Start`
+- `Android Screen: Stop`
+- `Android Screen: Restart`
 
 ## Troubleshooting
 
@@ -86,6 +86,10 @@ adb kill-server && adb start-server
 - Check USB cable
 - Enable "Stay Awake" in Developer Options
 - Verify USB debugging authorized
+
+## Contributing
+
+Contributions welcome! Please feel free to submit a Pull Request.
 
 ## License
 

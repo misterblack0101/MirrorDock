@@ -2,7 +2,9 @@ import { spawn, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
 import * as vscode from 'vscode';
 
-export class ScrcpyRunner extends EventEmitter {
+// Manages ADB screenrecord process and device input
+// Emits: 'frame' (video data), 'status' (connection state)
+export class AndroidStreamRunner extends EventEmitter {
     private process: ChildProcess | null = null;
     private isRunning: boolean = false;
     private shouldRestart: boolean = true;
