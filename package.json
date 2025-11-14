@@ -3,12 +3,21 @@
   "displayName": "MirrorDock",
   "description": "Mirror your Android device screen directly in VS Code",
   "version": "0.1.0",
-  "publisher": "your-publisher-name",
+  "publisher": "misterblack0101",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/mirrordock"
+    "url": "https://github.com/misterblack0101/MirrorDock"
   },
+  "keywords": [
+    "android",
+    "device",
+    "screen",
+    "mirror",
+    "adb",
+    "mobile",
+    "testing"
+  ],
   "engines": {
     "vscode": "^1.85.0"
   },
