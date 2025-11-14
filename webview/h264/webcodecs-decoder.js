@@ -1,8 +1,3 @@
-/**
- * WebCodecs H.264 Decoder - Production Ready
- * Decodes H.264 NAL units using browser's native VideoDecoder API
- */
-
 class H264Decoder {
     constructor() {
         this.canvas = null;
@@ -24,7 +19,7 @@ class H264Decoder {
     init(canvas) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d', { alpha: false });
-        console.log('[WebCodecs] Initializing H.264 decoder...');
+        console.log('[WebCodecs] Initializing...');
         this.isInitialized = true;
 
         if (canvas.width === 0 || canvas.height === 0) {
@@ -32,16 +27,15 @@ class H264Decoder {
             canvas.height = 1280;
         }
 
-        // Check WebCodecs support
         if (typeof VideoDecoder === 'undefined') {
-            console.error('[WebCodecs] VideoDecoder API not available!');
-            this.showError('WebCodecs API not supported in this browser');
+            console.error('[WebCodecs] VideoDecoder API not available');
+            this.showError('WebCodecs API not supported');
             return;
         }
 
         this.initDecoder();
         this.clearCanvas();
-        console.log('[WebCodecs] ✅ Initialized successfully');
+        console.log('[WebCodecs] ✅ Initialized');
     }
 
     initDecoder() {
@@ -83,10 +77,9 @@ class H264Decoder {
 
     processBuffer() {
         let processed = 0;
-        const maxIterations = 100; // Prevent infinite loops
+        const maxIterations = 100;
 
         while (processed < maxIterations) {
-            // Find NAL unit start code (0x00 0x00 0x00 0x01 or 0x00 0x00 0x01)
             const startIdx = this.findNalStart(0);
             if (startIdx === -1) {
                 break;
@@ -94,26 +87,22 @@ class H264Decoder {
 
             const nextIdx = this.findNalStart(startIdx + 3);
             if (nextIdx === -1) {
-                // Keep incomplete NAL unit in buffer
                 if (startIdx > 0) {
                     this.buffer = this.buffer.slice(startIdx);
                 }
                 break;
             }
 
-            // Extract NAL unit
             const nalUnit = this.buffer.slice(startIdx, nextIdx);
             this.handleNalUnit(nalUnit);
 
-            // Remove processed data (reuse buffer if possible)
             this.buffer = this.buffer.slice(nextIdx);
             processed++;
         }
 
-        // Prevent buffer from growing too large (512KB limit)
         if (this.buffer.length > 512 * 1024) {
-            console.warn('[WebCodecs] Buffer exceeded 512KB, clearing old data');
-            this.buffer = this.buffer.slice(-256 * 1024); // Keep last 256KB
+            console.warn('[WebCodecs] Buffer exceeded 512KB');
+            this.buffer = this.buffer.slice(-256 * 1024);
         }
     }
 

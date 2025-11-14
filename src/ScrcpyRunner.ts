@@ -2,9 +2,6 @@ import { spawn, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
 import * as vscode from 'vscode';
 
-/**
- * Manages the scrcpy process and handles video stream output
- */
 export class ScrcpyRunner extends EventEmitter {
     private process: ChildProcess | null = null;
     private isRunning: boolean = false;
@@ -14,45 +11,23 @@ export class ScrcpyRunner extends EventEmitter {
 
     constructor() {
         super();
-        this.outputChannel = vscode.window.createOutputChannel('Scrcpy');
+        this.outputChannel = vscode.window.createOutputChannel('Android Screen');
     }
 
-    /**
-     * Start the scrcpy process
-     */
     public async start(): Promise<void> {
         if (this.isRunning) {
-            this.outputChannel.appendLine('Scrcpy is already running');
+            this.outputChannel.appendLine('Already running');
             return;
         }
 
         try {
-            // Check if a device is connected
             await this.checkDeviceConnected();
-
-            // Kill any existing screenrecord processes on the device
             await this.killExistingScreenrecord();
 
             this.shouldRestart = true;
-            this.outputChannel.appendLine('Starting scrcpy...');
-            this.emit('status', 'starting', 'Starting scrcpy process...');
+            this.outputChannel.appendLine('Starting screen recording...');
+            this.emit('status', 'starting', 'Starting screen recording...');
 
-            // Simple approach: Use scrcpy with video output via ADB
-            // scrcpy will handle encoding efficiently
-            const args = [
-                '--video-codec=h264',
-                '--max-size=720',
-                '--max-fps=30',
-                '--video-bit-rate=1M',
-                '--no-audio',
-                '--no-window',
-                '--video-encoder=OMX.google.h264.encoder'
-            ];
-
-            this.outputChannel.appendLine(`Running: scrcpy ${args.join(' ')}`);
-
-            // For now, let's just go back to ADB screenrecord without ffmpeg transcoding
-            // We'll decode H.264 directly in the browser
             const adbArgs = [
                 'shell',
                 'screenrecord',
@@ -67,79 +42,65 @@ export class ScrcpyRunner extends EventEmitter {
 
             this.isRunning = true;
 
-            // Force a screen update to trigger immediate keyframe
-            // Wait a bit for screenrecord to initialize, then wake the screen
             setTimeout(async () => {
                 try {
-                    // Press and release power button to wake/refresh screen
                     await this.executeAdbCommand('input keyevent KEYCODE_WAKEUP', { ignoreErrors: true });
-                    // Small screen movement to force frame update without disrupting UI
                     await this.executeAdbCommand('input swipe 0 0 0 1 10', { ignoreErrors: true });
-                    this.outputChannel.appendLine('Triggered screen refresh for keyframe');
+                    this.outputChannel.appendLine('Triggered screen refresh');
                 } catch (e) {
-                    // Ignore errors, this is best-effort
+                    // Ignore
                 }
             }, 500);
 
-            // Handle stdout (raw video stream from scrcpy)
             if (this.process.stdout) {
                 this.process.stdout.on('data', (data: Buffer) => {
-                    // Emit raw video data
                     this.emit('frame', data);
                 });
             }
 
-            // Handle stderr (logs and errors)
             if (this.process.stderr) {
                 this.process.stderr.on('data', (data: Buffer) => {
                     const message = data.toString();
-                    this.outputChannel.appendLine(`scrcpy: ${message}`);
+                    this.outputChannel.appendLine(message);
 
-                    // Check for device connection
                     if (message.includes('device') || message.includes('encoder')) {
                         this.emit('status', 'running', 'Device connected');
                     }
                 });
-            }            // Handle process exit
-            this.process.on('exit', (code, signal) => {
+            } this.process.on('exit', (code, signal) => {
                 this.isRunning = false;
-                this.outputChannel.appendLine(`scrcpy process exited with code ${code}, signal ${signal}`);
+                this.outputChannel.appendLine(`Process exited: ${code}`);
 
                 if (this.shouldRestart && code !== 0) {
-                    this.outputChannel.appendLine('Attempting to restart scrcpy...');
+                    this.outputChannel.appendLine('Restarting...');
                     setTimeout(() => this.start(), 2000);
                 } else {
-                    this.emit('status', 'stopped', 'Scrcpy process stopped');
+                    this.emit('status', 'stopped', 'Stopped');
                 }
             });
 
-            // Handle errors
             this.process.on('error', (err) => {
                 this.outputChannel.appendLine(`Error: ${err.message}`);
                 this.emit('status', 'error', err.message);
                 this.isRunning = false;
             });
 
-            this.emit('status', 'running', 'Scrcpy started successfully');
+            this.emit('status', 'running', 'Started successfully');
 
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Unknown error';
-            this.outputChannel.appendLine(`Failed to start scrcpy: ${message}`);
+            this.outputChannel.appendLine(`Failed to start: ${message}`);
             this.emit('status', 'error', message);
             throw error;
         }
     }
 
-    /**
-     * Stop the scrcpy process
-     */
     public stop(): void {
         this.shouldRestart = false;
 
         if (this.process) {
-            this.outputChannel.appendLine('Stopping scrcpy...');
+            this.outputChannel.appendLine('Stopping...');
 
-            // Remove all listeners to prevent memory leaks
             if (this.process.stdout) {
                 this.process.stdout.removeAllListeners();
             }
@@ -151,20 +112,14 @@ export class ScrcpyRunner extends EventEmitter {
             this.process.kill('SIGTERM');
             this.process = null;
             this.isRunning = false;
-            this.emit('status', 'stopped', 'Scrcpy stopped');
+            this.emit('status', 'stopped', 'Stopped');
         }
     }
 
-    /**
-     * Check if scrcpy is running
-     */
     public getIsRunning(): boolean {
         return this.isRunning;
     }
 
-    /**
-     * Check if ADB device is connected
-     */
     private async checkDeviceConnected(): Promise<void> {
         return new Promise((resolve, reject) => {
             const check = spawn('adb', ['devices']);
@@ -195,25 +150,15 @@ export class ScrcpyRunner extends EventEmitter {
         });
     }
 
-    /**
-     * Kill any existing screenrecord processes on device
-     */
     private async killExistingScreenrecord(): Promise<void> {
         try {
-            this.outputChannel.appendLine('Checking for existing screenrecord processes...');
-            // Find and kill screenrecord processes
             await this.executeAdbCommand('pkill -9 screenrecord', { ignoreErrors: true });
-            // Small delay to ensure processes are killed
             await new Promise(resolve => setTimeout(resolve, 100));
         } catch (error) {
-            // Ignore errors - process might not exist
-            this.outputChannel.appendLine('No existing screenrecord processes found');
+            this.outputChannel.appendLine('No existing screenrecord processes');
         }
     }
 
-    /**
-     * Execute ADB command
-     */
     public async executeAdbCommand(command: string, options?: { ignoreErrors?: boolean }): Promise<void> {
         return new Promise((resolve, reject) => {
             const args = command.startsWith('shell ') ? command.split(' ') : ['shell', ...command.split(' ')];
@@ -258,9 +203,6 @@ export class ScrcpyRunner extends EventEmitter {
         });
     }
 
-    /**
-     * Send tap event to device
-     */
     public async tap(x: number, y: number): Promise<void> {
         try {
             await this.executeAdbCommand(`input tap ${Math.round(x)} ${Math.round(y)}`);
@@ -269,9 +211,6 @@ export class ScrcpyRunner extends EventEmitter {
         }
     }
 
-    /**
-     * Send swipe event to device
-     */
     public async swipe(x1: number, y1: number, x2: number, y2: number, duration: number): Promise<void> {
         try {
             await this.executeAdbCommand(
@@ -282,12 +221,8 @@ export class ScrcpyRunner extends EventEmitter {
         }
     }
 
-    /**
-     * Send long press event to device
-     */
     public async longPress(x: number, y: number, duration: number): Promise<void> {
         try {
-            // Long press is simulated as a swipe with same start/end coordinates
             await this.executeAdbCommand(
                 `input swipe ${Math.round(x)} ${Math.round(y)} ${Math.round(x)} ${Math.round(y)} ${duration}`
             );
@@ -296,19 +231,13 @@ export class ScrcpyRunner extends EventEmitter {
         }
     }
 
-    /**
-     * Cleanup resources
-     */
     public dispose(): void {
         this.stop();
 
-        // Kill any pending ADB commands
         this.pendingCommands.forEach(proc => {
             try {
                 proc.kill();
-            } catch (e) {
-                // Ignore
-            }
+            } catch (e) { }
         });
         this.pendingCommands.clear();
 

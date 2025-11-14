@@ -2,9 +2,6 @@ import * as vscode from 'vscode';
 import { ScrcpyRunner } from './ScrcpyRunner';
 import { WebViewMessage, TapInputMessage, SwipeInputMessage, LongPressInputMessage } from './types/messages';
 
-/**
- * WebView provider for the scrcpy device panel
- */
 export class ScrcpyViewProvider implements vscode.WebviewViewProvider {
     private _view?: vscode.WebviewView;
     private scrcpyRunner: ScrcpyRunner;
@@ -15,9 +12,6 @@ export class ScrcpyViewProvider implements vscode.WebviewViewProvider {
         this.setupScrcpyListeners();
     }
 
-    /**
-     * Resolve the webview view
-     */
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
         context: vscode.WebviewViewResolveContext,
@@ -34,27 +28,21 @@ export class ScrcpyViewProvider implements vscode.WebviewViewProvider {
 
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
-        // Handle messages from the webview
         webviewView.webview.onDidReceiveMessage(async (message: WebViewMessage) => {
             await this.handleWebViewMessage(message);
         });
 
-        // Handle visibility changes
         webviewView.onDidChangeVisibility(() => {
             if (webviewView.visible && this.autoStart) {
                 this.start();
             }
         });
 
-        // Auto-start if configured
         if (this.autoStart) {
             this.start();
         }
     }
 
-    /**
-     * Handle messages from WebView
-     */
     private async handleWebViewMessage(message: WebViewMessage): Promise<void> {
         switch (message.type) {
             case 'input':
@@ -69,9 +57,6 @@ export class ScrcpyViewProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    /**
-     * Handle input events from WebView
-     */
     private async handleInputMessage(
         message: TapInputMessage | SwipeInputMessage | LongPressInputMessage
     ): Promise<void> {
@@ -98,23 +83,16 @@ export class ScrcpyViewProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    /**
-     * Setup listeners for scrcpy events
-     */
     private setupScrcpyListeners(): void {
-        // Handle video frames
         this.scrcpyRunner.on('frame', (data: Buffer) => {
             if (this._view) {
-                // Convert Buffer to array for JSON serialization
-                const frameData = Array.from(data);
                 this._view.webview.postMessage({
                     type: 'frame',
-                    data: frameData
+                    data: Array.from(data)
                 });
             }
         });
 
-        // Handle status changes
         this.scrcpyRunner.on('status', (status: string, message: string) => {
             if (this._view) {
                 this._view.webview.postMessage({
@@ -126,14 +104,11 @@ export class ScrcpyViewProvider implements vscode.WebviewViewProvider {
         });
     }
 
-    /**
-     * Start scrcpy
-     */
     public async start(): Promise<void> {
         this.autoStart = true;
 
         if (!this._view?.visible) {
-            vscode.window.showInformationMessage('Opening Scrcpy Device panel...');
+            vscode.window.showInformationMessage('Opening device panel...');
             return;
         }
 
@@ -141,39 +116,28 @@ export class ScrcpyViewProvider implements vscode.WebviewViewProvider {
             await this.scrcpyRunner.start();
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Unknown error';
-            vscode.window.showErrorMessage(`Failed to start scrcpy: ${message}`);
+            vscode.window.showErrorMessage(`Failed to start: ${message}`);
         }
     }
 
-    /**
-     * Stop scrcpy
-     */
     public stop(): void {
         this.autoStart = false;
         this.scrcpyRunner.stop();
     }
 
-    /**
-     * Restart scrcpy
-     */
     public async restart(): Promise<void> {
         this.stop();
 
-        // Clear decoder state in WebView
         if (this._view) {
             this._view.webview.postMessage({
                 type: 'clear'
             });
         }
 
-        // Wait a bit for cleanup
         await new Promise(resolve => setTimeout(resolve, 500));
         await this.start();
     }
 
-    /**
-     * Get HTML content for webview
-     */
     private _getHtmlForWebview(webview: vscode.Webview): string {
         const scriptUri = webview.asWebviewUri(
             vscode.Uri.joinPath(this._extensionUri, 'webview', 'view.js')
@@ -222,9 +186,6 @@ export class ScrcpyViewProvider implements vscode.WebviewViewProvider {
 </html>`;
     }
 
-    /**
-     * Generate a nonce for CSP
-     */
     private getNonce(): string {
         let text = '';
         const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -234,9 +195,6 @@ export class ScrcpyViewProvider implements vscode.WebviewViewProvider {
         return text;
     }
 
-    /**
-     * Cleanup
-     */
     public dispose(): void {
         this.scrcpyRunner.dispose();
     }
